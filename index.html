@@ -69,7 +69,7 @@
           <button id="btnQuery">查询</button>
           <div id="qResult" class="kpi">—</div>
         </div>
-        <div class="muted" style="margin-top:8px">周日将显示 <span class="warn">大扫除</span>，且不会推进轮换。</div>
+        <div class="muted" style="margin-top:8px">周日将显示 <span class=\"warn\">大扫除<\/span>，且不会推进轮换；每个月的<span class=\"warn\">第一个周日<\/span>会额外提示：洗衣机消毒。</div>
       </section>
 
       <!-- 设置 -->
@@ -121,6 +121,7 @@
       return (w + 7) % 7; // normalize
     }
     function isSunday(y, m, d) { return weekday(y, m, d) === 0; }
+    function isFirstSunday(y, m, d) { return weekday(y, m, d) === 0 && d <= 7; }
 
     // 统计 [start, end) 内非周日天数（左闭右开）O(1)+最多 6 次余数扫描
     function countNonSundays(start, end) {
@@ -139,7 +140,10 @@
 
     // 返回某日值日者；若周日返回 "大扫除"
     function dutyForDate(target, names, anchor, anchorIndex) {
-      if (isSunday(target.y, target.m, target.d)) return "大扫除";
+      if (isSunday(target.y, target.m, target.d)) {
+      const extra = isFirstSunday(target.y, target.m, target.d) ? "（本月第一个周日：请进行洗衣机消毒）" : "";
+      return "大扫除" + extra;
+    }
       // 若锚点在周日，顺延到下一天（避免歧义）
       const anchorAdj = isSunday(anchor.y, anchor.m, anchor.d)
         ? addDays(anchor, 1)
