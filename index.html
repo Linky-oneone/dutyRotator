@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>值日轮换（大扫除）</title>
+  <meta name="description" content="五人轮值，周日跳过且不计入循环。支持自定义姓名、锚点日期与起始人。时区：Asia/Shanghai。" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a33;
+      --text: #e8ecff;
+      --muted: #a7b0d6;
+      --accent: #7aa2ff;
+      --border: #1e2a52;
+      --ok: #7df1a8;
+      --warn: #ffd166;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { background: linear-gradient(180deg, rgba(18,26,51,0.9), rgba(18,26,51,0.75)); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+    .card h2 { font-size: 18px; margin: 0 0 10px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 13px; color: var(--muted); }
+    input[type="text"], input[type="number"], input[type="date"] { width: 100%; background: #0e1530; color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; outline: none; transition: border .15s ease; }
+    input:focus { border-color: var(--accent); }
+    button { background: var(--accent); color: #0a0f20; border: none; border-radius: 12px; padding: 10px 14px; font-weight: 700; cursor: pointer; transition: transform .05s ease, filter .2s ease; }
+    button:active { transform: translateY(1px); }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .ok { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); }
+    .kpi { font-size: 26px; font-weight: 800; letter-spacing: .2px; }
+
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>值日轮换（周日跳过，不计入循环）</h1>
+    <div class="sub">算法以“锚点日期 + 锚点当天值日者”为基准，统计两日期之间 <strong>非周日</strong> 的天数推进序列。时区固定：<span class="code">Asia/Shanghai</span>（北京时间）。</div>
+
+    <div class="grid">
+      <!-- 今天值日 -->
+      <section class="card" style="grid-column: span 12;">
+        <h2>今天谁值日？</h2>
+        <div class="row" style="justify-content: space-between; align-items: flex-end; gap: 12px;">
+          <div>
+            <div id="todayDate" class="muted">—</div>
+            <div id="todayDuty" class="kpi">—</div>
+          </div>
+          <div class="muted">以当前配置计算</div>
+        </div>
+      </section>
+
+      <!-- 任意日期查询 -->
+      <section class="card" style="grid-column: span 12;">
+        <h2>查询任意日期</h2>
+        <div class="row">
+          <div class="field"><label>日期</label><input id="qDate" type="date"></div>
+          <button id="btnQuery">查询</button>
+          <div id="qResult" class="kpi">—</div>
+        </div>
+        <div class="muted" style="margin-top:8px">周日将显示 <span class="warn">大扫除</span>，且不会推进轮换。</div>
+      </section>
+
+      <!-- 设置 -->
+      <section class="card" style="grid-column: span 12;">
+        <h2>设置</h2>
+        <div class="row" style="gap:12px; align-items: flex-end;">
+          <div class="field" style="min-width:140px"><label>锚点日期（非周日）</label><input id="anchorDate" type="date"></div>
+          <div class="field" style="width:180px"><label>锚点当天由谁值日（索引，0 开始）</label><input id="anchorIndex" type="number" min="0" step="1"></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="grid">
+          <div class="field" style="grid-column: span 6; min-width:220px"><label>成员 1</label><input id="n0" type="text" placeholder="李hr &amp; 李bh"></div>
+          <div class="field" style="grid-column: span 6; min-width:220px"><label>成员 2</label><input id="n1" type="text" placeholder="林pf &amp; 沈yc"></div>
+          <div class="field" style="grid-column: span 6; min-width:220px"><label>成员 3</label><input id="n2" type="text" placeholder="陈zz &amp; 陈jh"></div>
+          <div class="field" style="grid-column: span 6; min-width:220px"><label>成员 4</label><input id="n3" type="text" placeholder="赵fj &amp; 胡x"></div>
+          <div class="field" style="grid-column: span 6; min-width:220px"><label>成员 5</label><input id="n4" type="text" placeholder="高sq &amp; 龚yx"></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <button id="btnSave">保存设置</button>
+          <button id="btnDefault" class="ghost">恢复示例默认（2025-11-03=陈zz &amp; 陈jh）</button>
+        </div>
+        <div class="muted" style="margin-top:8px">姓名顺序与锚点确定后，任何日期的值日名单都唯一确定；设置保存在浏览器 <span class="code">localStorage</span> 中。</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // —— 纯“公历”算法：将 Y-M-D 映射为从 1970-01-01 起的日数（与时区无关） ——
+    function civilToDays(y, m, d) {
+      // Howard Hinnant's algorithm (proleptic Gregorian)
+      // returns days since 1970-01-01
+      y -= (m <= 2) ? 1 : 0;
+      const era = Math.trunc(y >= 0 ? y / 400 : (y - 399) / 400);
+      const yoe = y - era * 400; // [0,399]
+      const mAdj = m + (m > 2 ? -3 : 9); // Mar=0..Jan=10, Feb=11
+      const doy = Math.trunc((153 * mAdj + 2) / 5) + d - 1; // [0,365]
+      const doe = yoe * 365 + Math.trunc(yoe / 4) - Math.trunc(yoe / 100) + doy; // [0,146096]
+      return era * 146097 + doe - 719468; // 719468 = days to 1970-01-01
+    }
+    function daysDiff(a, b) { // [a, b) length in days
+      return civilToDays(b.y, b.m, b.d) - civilToDays(a.y, a.m, a.d);
+    }
+    function weekday(y, m, d) {
+      // 0=Sunday .. 6=Saturday
+      const days = civilToDays(y, m, d);
+      let w = (days + 4) % 7; // 1970-01-01 = Thursday => 4
+      if (w < 0) w += 7;
+      return (w + 7) % 7; // normalize
+    }
+    function isSunday(y, m, d) { return weekday(y, m, d) === 0; }
+
+    // 统计 [start, end) 内非周日天数（左闭右开）O(1)+最多 6 次余数扫描
+    function countNonSundays(start, end) {
+      const N = daysDiff(start, end);
+      if (N <= 0) return 0;
+      const fullWeeks = Math.trunc(N / 7);
+      let count = fullWeeks * 6;
+      let rem = N % 7;
+      let wd = weekday(start.y, start.m, start.d); // 0..6，start 当天
+      while (rem-- > 0) {
+        if (wd !== 0) count++; // 非周日计入
+        wd = (wd + 1) % 7;
+      }
+      return count;
+    }
+
+    // 返回某日值日者；若周日返回 "大扫除"
+    function dutyForDate(target, names, anchor, anchorIndex) {
+      if (isSunday(target.y, target.m, target.d)) return "大扫除";
+      // 若锚点在周日，顺延到下一天（避免歧义）
+      const anchorAdj = isSunday(anchor.y, anchor.m, anchor.d)
+        ? addDays(anchor, 1)
+        : anchor;
+      const eff = countNonSundays(anchorAdj, target);
+      const n = names.length;
+      const idx = ((anchorIndex % n) + n + eff) % n;
+      return names[idx];
+    }
+
+    function addDays(ymd, k) {
+      // 简易逐日推进：k 范围很小（仅在锚点为周日时用 1 天）
+      const d0 = civilToDays(ymd.y, ymd.m, ymd.d) + k;
+      return daysToCivil(d0);
+    }
+
+    function daysToCivil(z) {
+      // 反向：从 1970-01-01 起第 z 天 → Y-M-D
+      z += 719468;
+      const era = Math.trunc(z >= 0 ? z / 146097 : (z - 146096) / 146097);
+      const doe = z - era * 146097; // [0,146096]
+      const yoe = Math.trunc((doe - Math.trunc(doe/1460) + Math.trunc(doe/36524) - Math.trunc(doe/146096)) / 365);
+      let y = yoe + era * 400;
+      const doy = doe - (365*yoe + Math.trunc(yoe/4) - Math.trunc(yoe/100));
+      const mp = Math.trunc((5*doy + 2)/153); // 0=Mar..11=Feb
+      const d = doy - Math.trunc((153*mp + 2)/5) + 1;
+      let m = mp + (mp < 10 ? 3 : -9);
+      y += (m <= 2) ? 1 : 0;
+      return { y, m, d };
+    }
+
+    // —— 取“今天”的本地公历日期（Asia/Shanghai） ——
+    function todayShanghai() {
+      const fmt = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' });
+      const parts = fmt.formatToParts(new Date());
+      const y = parseInt(parts.find(p => p.type === 'year').value, 10);
+      const m = parseInt(parts.find(p => p.type === 'month').value, 10);
+      const d = parseInt(parts.find(p => p.type === 'day').value, 10);
+      return { y, m, d };
+    }
+
+    // —— 本地存储 ——
+    const STORAGE_KEY = 'duty_prefs_v1';
+    function loadPrefs() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    function savePrefs(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+
+    // —— 默认：确保 2025-11-03（周一）= C ——
+    const defaultPrefs = {
+      names: ["李hr & 李bh","林pf & 沈yc","陈zz & 陈jh","赵fj & 胡x","高sq & 龚yx"],
+      anchor: { y: 2025, m: 11, d: 3 }, // 周一
+      anchorIndex: 2 // 对应 C
+    };
+
+    // —— DOM ref ——
+    const el = {
+      todayDate: document.getElementById('todayDate'),
+      todayDuty: document.getElementById('todayDuty'),
+      qDate: document.getElementById('qDate'),
+      qResult: document.getElementById('qResult'),
+      btnQuery: document.getElementById('btnQuery'),
+      anchorDate: document.getElementById('anchorDate'),
+      anchorIndex: document.getElementById('anchorIndex'),
+      n0: document.getElementById('n0'),
+      n1: document.getElementById('n1'),
+      n2: document.getElementById('n2'),
+      n3: document.getElementById('n3'),
+      n4: document.getElementById('n4'),
+      btnSave: document.getElementById('btnSave'),
+      btnDefault: document.getElementById('btnDefault')
+    };
+
+    function ymdToInputValue({y,m,d}) {
+      const mm = String(m).padStart(2,'0');
+      const dd = String(d).padStart(2,'0');
+      return `${y}-${mm}-${dd}`;
+    }
+    function inputValueToYmd(v) {
+      const [y, m, d] = v.split('-').map(Number);
+      return { y, m, d };
+    }
+
+    function renderAll() {
+      const prefs = loadPrefs() || defaultPrefs;
+      // 填充设置
+      const ns = prefs.names;
+      el.n0.value = ns[0] ?? '';
+      el.n1.value = ns[1] ?? '';
+      el.n2.value = ns[2] ?? '';
+      el.n3.value = ns[3] ?? '';
+      el.n4.value = ns[4] ?? '';
+      el.anchorIndex.value = prefs.anchorIndex ?? 0;
+      el.anchorDate.value = ymdToInputValue(prefs.anchor);
+
+      // 今日
+      const today = todayShanghai();
+      el.todayDate.textContent = `${today.y}-${String(today.m).padStart(2,'0')}-${String(today.d).padStart(2,'0')}（周${"日一二三四五六"[weekday(today.y,today.m,today.d)]}）`;
+      const duty = dutyForDate(today, ns, prefs.anchor, prefs.anchorIndex);
+      el.todayDuty.textContent = duty;
+
+      // 查询默认日期 = 今天
+      el.qDate.value = ymdToInputValue(today);
+      el.qResult.textContent = duty;
+    }
+
+    el.btnQuery.addEventListener('click', () => {
+      const prefs = loadPrefs() || defaultPrefs;
+      if (!el.qDate.value) return;
+      const q = inputValueToYmd(el.qDate.value);
+      const duty = dutyForDate(q, prefs.names, prefs.anchor, prefs.anchorIndex);
+      const wd = "日一二三四五六"[weekday(q.y,q.m,q.d)];
+      el.qResult.textContent = `${q.y}-${String(q.m).padStart(2,'0')}-${String(q.d).padStart(2,'0')}（周${wd}） → ${duty}`;
+    });
+
+    el.btnSave.addEventListener('click', () => {
+      // 读取并校验
+      const names = [el.n0.value || 'A', el.n1.value || 'B', el.n2.value || 'C', el.n3.value || 'D', el.n4.value || 'E'];
+      const anchor = inputValueToYmd(el.anchorDate.value || ymdToInputValue(defaultPrefs.anchor));
+      let anchorIndex = parseInt(el.anchorIndex.value, 10);
+      if (!Number.isFinite(anchorIndex)) anchorIndex = 0;
+      anchorIndex = Math.max(0, Math.min(anchorIndex, names.length - 1));
+
+      if (isSunday(anchor.y, anchor.m, anchor.d)) {
+        alert('锚点日期是周日：将自动顺延至下一天并保存。');
+      }
+
+      savePrefs({ names, anchor, anchorIndex });
+      renderAll();
+    });
+
+    el.btnDefault.addEventListener('click', () => {
+      savePrefs(defaultPrefs);
+      renderAll();
+    });
+
+    // 初始化
+    if (!loadPrefs()) savePrefs(defaultPrefs);
+    renderAll();
+  </script>
+</body>
+</html>
